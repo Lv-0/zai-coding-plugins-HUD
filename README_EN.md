@@ -1,3 +1,5 @@
+**[中文](README.md)** | **[English](README_EN.md)**
+
 # ZAI Coding Plugins HUD
 
 Forked and refactored from `leeguooooo/claude-code-usage-bar`, a Claude Code status bar monitor built for **ZAI / ZHIPU** platform usage tracking.

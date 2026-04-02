@@ -1,3 +1,5 @@
+**[中文](README.md)** | **[English](README_EN.md)**
+
 # ZAI Coding Plugins HUD
 
 基于 `leeguooooo/claude-code-usage-bar` 重构，面向 **ZAI / 智谱 (ZHIPU)** 平台使用量的 Claude Code 状态栏监控工具。
