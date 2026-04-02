@@ -56,24 +56,30 @@ def _build_time_window() -> Tuple[str, str]:
 
 def _http_get(url: str, auth_token: str, timeout: int = 10) -> Dict[str, Any]:
     """Make an authenticated GET request and return parsed JSON."""
-    req = urllib.request.Request(url, headers={
-        "Authorization": auth_token,
-        "Accept-Language": "en-US,en",
-        "Content-Type": "application/json",
-    })
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": auth_token,
+            "Accept-Language": "en-US,en",
+            "Content-Type": "application/json",
+        },
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = resp.read().decode("utf-8")
         return json.loads(body)
 
 
 def _process_quota_limits(data: Any) -> Dict[str, Any]:
-    """Process quota limit response, extracting TOKENS_LIMIT and TIME_LIMIT."""
+    """Process quota limit response, extracting all TOKENS_LIMIT and TIME_LIMIT items.
+
+    Platforms may return multiple TOKENS_LIMIT entries (e.g. short-term + long-term
+    rolling windows).  We sort them by nextResetTime so that:
+      - token_limits[0]  = shortest-window (used for "5h" bar)
+      - token_limits[-1] = longest-window  (used for "7d" bar)
+    """
     result: Dict[str, Any] = {
-        "token_usage_pct": None,
-        "mcp_usage_pct": None,
-        "mcp_current_usage": None,
-        "mcp_total": None,
-        "mcp_details": None,
+        "token_limits": [],
+        "time_limit": None,
         "raw_limits": [],
     }
 
@@ -86,12 +92,11 @@ def _process_quota_limits(data: Any) -> Dict[str, Any]:
     for item in limits:
         item_type = item.get("type", "")
         if item_type == "TOKENS_LIMIT":
-            result["token_usage_pct"] = item.get("percentage")
+            result["token_limits"].append(item)
         elif item_type == "TIME_LIMIT":
-            result["mcp_usage_pct"] = item.get("percentage")
-            result["mcp_current_usage"] = item.get("currentValue")
-            result["mcp_total"] = item.get("usage")
-            result["mcp_details"] = item.get("usageDetails")
+            result["time_limit"] = item
+
+    result["token_limits"].sort(key=lambda x: x.get("nextResetTime", float("inf")))
 
     return result
 
@@ -102,11 +107,9 @@ def query_usage() -> Optional[Dict[str, Any]]:
     Returns a dict with:
       - platform: "ZAI" or "ZHIPU"
       - source: "zai-plugin"
-      - token_usage_pct: 5-hour token usage percentage (from quota limit)
-      - mcp_usage_pct: MCP monthly usage percentage
       - model_usage: raw model usage data
       - tool_usage: raw tool usage data
-      - quota_limit: processed quota limits
+      - quota_raw: raw limits list from the platform API
     Or None if the platform is not configured or query fails.
     """
     platform_info = _detect_platform()
@@ -128,41 +131,31 @@ def query_usage() -> Optional[Dict[str, Any]]:
         "source": "zai-plugin",
         "model_usage": None,
         "tool_usage": None,
-        "token_usage_pct": None,
-        "mcp_usage_pct": None,
+        "quota_raw": None,
     }
 
     try:
-        # Query model usage
         try:
             resp = _http_get(model_usage_url + query_params, auth_token)
             result["model_usage"] = resp.get("data", resp)
         except Exception as e:
             logger.debug("Model usage query failed: %s", e)
 
-        # Query tool usage
         try:
             resp = _http_get(tool_usage_url + query_params, auth_token)
             result["tool_usage"] = resp.get("data", resp)
         except Exception as e:
             logger.debug("Tool usage query failed: %s", e)
 
-        # Query quota limit (no time params)
         try:
             resp = _http_get(quota_limit_url, auth_token)
             raw_data = resp.get("data", resp)
             processed = _process_quota_limits(raw_data)
-            result["token_usage_pct"] = processed["token_usage_pct"]
-            result["mcp_usage_pct"] = processed["mcp_usage_pct"]
-            result["mcp_current_usage"] = processed["mcp_current_usage"]
-            result["mcp_total"] = processed["mcp_total"]
-            result["mcp_details"] = processed["mcp_details"]
             result["quota_raw"] = processed["raw_limits"]
         except Exception as e:
             logger.debug("Quota limit query failed: %s", e)
 
-        # Only return if we got at least the quota data
-        if result["token_usage_pct"] is None and result["mcp_usage_pct"] is None:
+        if result["quota_raw"] is None:
             return None
 
         return result
