@@ -44,10 +44,16 @@ def _format_datetime(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _build_time_window() -> Tuple[str, str]:
-    """Build time window: yesterday at current hour → today at current hour end (UTC)."""
-    now = datetime.now(timezone.utc)
-    # Use timedelta to handle month boundaries correctly
+def _build_time_window(tz_offset_hours: int = 0) -> Tuple[str, str]:
+    """Build time window: yesterday at current hour → today at current hour end.
+
+    Args:
+        tz_offset_hours: Server timezone offset from UTC (e.g., 8 for UTC+8).
+                         Query timestamps will be in this timezone so the API
+                         returns data aligned with the server's clock.
+    """
+    tz = timezone(__import__("datetime").timedelta(hours=tz_offset_hours))
+    now = datetime.now(tz)
     yesterday = now - __import__("datetime").timedelta(days=1)
     start = datetime(yesterday.year, yesterday.month, yesterday.day, now.hour, 0, 0)
     end = datetime(now.year, now.month, now.day, now.hour, 59, 59)
@@ -96,7 +102,8 @@ def _process_quota_limits(data: Any) -> Dict[str, Any]:
         elif item_type == "TIME_LIMIT":
             result["time_limit"] = item
 
-    result["token_limits"].sort(key=lambda x: x.get("nextResetTime", float("inf")))
+    # Sort by unit: smaller unit = shorter window (used for "5h" bar)
+    result["token_limits"].sort(key=lambda x: x.get("unit", float("inf")))
 
     return result
 
@@ -123,7 +130,9 @@ def query_usage() -> Optional[Dict[str, Any]]:
     tool_usage_url = f"{base_domain}/api/monitor/usage/tool-usage"
     quota_limit_url = f"{base_domain}/api/monitor/usage/quota/limit"
 
-    start_time, end_time = _build_time_window()
+    # ZHIPU servers use UTC+8; ZAI uses UTC
+    tz_offset = 8 if platform == "ZHIPU" else 0
+    start_time, end_time = _build_time_window(tz_offset)
     query_params = f"?startTime={urllib.parse.quote(start_time)}&endTime={urllib.parse.quote(end_time)}"
 
     result: Dict[str, Any] = {

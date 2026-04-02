@@ -78,7 +78,10 @@ def try_zai_plugin_query() -> Optional[Dict[str, Any]]:
             token_limits = processed_limits.get("token_limits", [])
             time_limit_item = processed_limits.get("time_limit")
 
-        token_limits.sort(key=lambda x: x.get("nextResetTime", float("inf")))
+        # Sort by unit: smaller unit value = shorter window (displayed as "5h")
+        # unit=3 → short-term rolling window; unit=6 → long-term rolling window
+        # This is more reliable than sorting by nextResetTime which can cross over.
+        token_limits.sort(key=lambda x: x.get("unit", float("inf")))
 
         token_pct = None
         rate_limit_resets_at = None
