@@ -81,7 +81,7 @@ def _process_quota_limits(data: Any) -> Dict[str, Any]:
     Platforms may return multiple TOKENS_LIMIT entries (e.g. short-term + long-term
     rolling windows).  We sort them by nextResetTime so that:
       - token_limits[0]  = shortest-window (used for "5h" bar)
-      - token_limits[-1] = longest-window  (used for "7d" bar)
+      - token_limits[-1] = longest-window  (second "5h" bar for ZHIPU, both are 5h windows)
     """
     result: Dict[str, Any] = {
         "token_limits": [],

@@ -33,7 +33,7 @@ def try_zai_plugin_query() -> Optional[Dict[str, Any]]:
 
     Returns usage data with:
       - rate_limit_pct:   shortest-window TOKENS_LIMIT percentage
-      - rate_limit_7d_pct: longest-window TOKENS_LIMIT percentage
+      - rate_limit_7d_pct: longest-window TOKENS_LIMIT percentage (also 5h for ZHIPU)
       - rate_limit_resets_at: shortest-window reset timestamp (seconds, UTC)
       - mcp_usage_pct / mcp_current_usage / mcp_total: TIME_LIMIT (MCP tools)
     or None if the platform is not configured.
@@ -1317,6 +1317,7 @@ def main(
                         weekly_pct=weekly_pct,
                         bypass=bypass,
                         use_color=use_color,
+                        weekly_label="5h",
                     )
                 )
         elif has_official:

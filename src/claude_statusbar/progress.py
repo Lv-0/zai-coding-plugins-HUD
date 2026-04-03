@@ -76,12 +76,18 @@ def format_status_line(
     ctx_pct: Optional[float] = None,
     bypass: bool = False,
     use_color: bool = True,
+    weekly_label: str = "7d",
 ) -> str:
     """Build the complete status bar string.
 
-    Shows 5-hour window, 7-day weekly window, and context window usage.
+    Shows 5-hour window and second window usage.
     Each progress bar is colored independently. Surrounding text uses
     the highest severity color across all dimensions.
+
+    Args:
+        weekly_label: Label for the second progress bar.
+            "7d" for Claude.ai's seven-day limit (default),
+            "5h" for ZHIPU's second 5-hour rolling window.
     """
     # Overall color = max severity across all dimensions (ctx excluded — it's per-session)
     all_pcts = [p for p in (msgs_pct, tkns_pct, weekly_pct) if p is not None]
@@ -89,7 +95,7 @@ def format_status_line(
 
     parts = [
         _build_dimension("5h", msgs_pct, overall_color, use_color),
-        _build_dimension("7d", weekly_pct, overall_color, use_color),
+        _build_dimension(weekly_label, weekly_pct, overall_color, use_color),
     ]
 
     parts.append(colorize(f"⏰{reset_time}", overall_color, use_color))
